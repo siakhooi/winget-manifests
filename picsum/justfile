@@ -1,0 +1,20 @@
+Author := "SiakHooi"
+PackageName := "Picsum"
+
+packageVersion := "1.2.2"
+packageUrl := "https://github.com/" + Author + "/" + PackageName + "/releases/download/v" + packageVersion + "/" + PackageName + "_" + packageVersion + "_Windows_x86_64.zip"
+
+manifestsPath := "manifests/s/" + Author + "/" + PackageName + "/" + packageVersion
+validate:
+    winget.exe validate --manifest "{{ manifestsPath }}"
+
+test:
+    winget.exe install --manifest "{{ manifestsPath }}"
+
+pr_title := Author + "." + PackageName + " " + packageVersion
+gh_token := ""
+submit:
+    wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
+
+# https://github.com/microsoft/winget-pkgs/pull/378673
+# https://github.com/microsoft/winget-pkgs/pull/381730

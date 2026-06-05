@@ -1,0 +1,19 @@
+Author := "SiakHooi"
+packageVersion := "1.6.0"
+PackageName := "JexlExecutor"
+RepoName := "jexl-executor"
+packageUrl := "https://github.com/siakhooi/" + RepoName + "/releases/download/" + packageVersion + "/" + RepoName + "-" + packageVersion + "-windows-x64.zip"
+
+manifestsPath := "manifests/s/" + Author + "/" + PackageName + "/" + packageVersion
+validate:
+    winget.exe validate --manifest "{{ manifestsPath }}"
+
+test:
+    winget.exe install --manifest "{{ manifestsPath }}"
+
+pr_title := Author + "." + PackageName + " " + packageVersion
+gh_token := ""
+submit:
+    wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
+
+# https://github.com/microsoft/winget-pkgs/pull/382986
