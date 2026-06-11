@@ -1,5 +1,5 @@
 Author := "SiakHooi"
-packageVersion := "1.6.0"
+packageVersion := "1.6.2"
 PackageName := "JexlExecutor"
 RepoName := "jexl-executor"
 packageUrl := "https://github.com/siakhooi/" + RepoName + "/releases/download/" + packageVersion + "/" + RepoName + "-" + packageVersion + "-windows-x64.zip"
@@ -17,3 +17,4 @@ submit:
     wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
 
 # https://github.com/microsoft/winget-pkgs/pull/382986
+# https://github.com/microsoft/winget-pkgs/pull/386619
