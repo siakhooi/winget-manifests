@@ -1,5 +1,5 @@
 Author := "SiakHooi"
-packageVersion := "1.1.1"
+packageVersion := "1.1.2"
 PackageName := "Semvery"
 packageUrl := "https://github.com/siakhooi/semvery/releases/download/" + packageVersion + "/" + PackageName + "-" + packageVersion + "-windows-x64.zip"
 
@@ -15,4 +15,5 @@ gh_token := ""
 submit:
     wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
 
-# https://github.com/microsoft/winget-pkgs/pull/382422
+# 1.1.1 https://github.com/microsoft/winget-pkgs/pull/382422
+# 1.1.2 https://github.com/microsoft/winget-pkgs/pull/387967
