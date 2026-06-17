@@ -18,8 +18,5 @@ Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/SiakHooi/Picsum/releases/download/v1.2.2/picsum_1.2.2_Windows_x86_64.zip
   InstallerSha256: 52994F29F8E678BE45265261A8543F9CA0EAA9F820CA45644CDC7D8853ABB6FE
-- Architecture: arm64
-  InstallerUrl: https://github.com/SiakHooi/Picsum/releases/download/v1.2.2/picsum_1.2.2_Windows_arm64.zip
-  InstallerSha256: 8eaafd264ba7a15f732855ccaed439bfbf657f0816237a5cd06576c4a11893cc
 ManifestType: installer
 ManifestVersion: 1.12.0

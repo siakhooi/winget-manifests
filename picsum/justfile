@@ -17,4 +17,4 @@ submit:
     wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
 
 # https://github.com/microsoft/winget-pkgs/pull/378673
-# https://github.com/microsoft/winget-pkgs/pull/381730
+# https://github.com/microsoft/winget-pkgs/pull/389314
