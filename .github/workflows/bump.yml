@@ -1,0 +1,47 @@
+name: Bump winget manifests
+
+on:
+  schedule:
+    # 04:00 Malaysia time (Asia/Kuala_Lumpur, UTC+8, no DST)
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "Package names (space-separated). Empty = all."
+        required: false
+        type: string
+
+concurrency:
+  group: bump-winget-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bump manifests and submit to winget-pkgs
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 script/bump.py ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.packages || '' }}
+
+      - name: Commit local manifests
+        if: always() && !cancelled()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No local manifest changes"
+            exit 0
+          fi
+          git commit -m "Bump winget manifests to latest GitHub releases"
+          git push
