@@ -22,7 +22,7 @@ Tags:
 ReleaseNotesUrl: https://github.com/siakhooi/jexl-executor/releases/tag/1.6.4
 ManifestType: defaultLocale
 InstallationNotes: |
-  The binary is installed as %LOCALAPPDATA%\semvery\semvery.exe.
+  The binary is installed as %LOCALAPPDATA%\jexl-executor\jexl-executor.exe.
 
-  Run it with the full path to that executable, or add %LOCALAPPDATA%\semvery to your PATH.
+  Run it with the full path to that executable, or add %LOCALAPPDATA%\jexl-executor to your PATH.
 ManifestVersion: 1.12.0
