@@ -246,14 +246,7 @@ function Get-PackageList {
         if (-not (Test-Path -LiteralPath $manifests -PathType Container)) {
             return
         }
-        $versionDirs = @(
-            Get-ChildItem -Path $manifests -Recurse -Directory |
-                Where-Object {
-                    $relative = $_.FullName.Substring($manifests.Length).TrimStart('\', '/')
-                    $parts = @($relative -split '[\\/]' | Where-Object { $_ })
-                    $parts.Count -eq 4
-                }
-        )
+        $versionDirs = @(Get-PackageVersionDirs -PackagePath $_.FullName)
         if ($versionDirs.Count -eq 0) {
             throw "$($_.Name): no version directories under manifests/"
         }
@@ -328,6 +321,42 @@ function Resolve-PackageSelection {
     return $selected
 }
 
+function ConvertTo-IsoDate {
+    param($Value)
+    if ($null -eq $Value -or $Value -eq '') {
+        return ''
+    }
+    if ($Value -is [datetime]) {
+        return ([datetime]$Value).ToUniversalTime().ToString('yyyy-MM-dd')
+    }
+    $text = [string]$Value
+    if ($text -match '^(\d{4}-\d{2}-\d{2})') {
+        return $Matches[1]
+    }
+    try {
+        return ([datetime]$text).ToUniversalTime().ToString('yyyy-MM-dd')
+    }
+    catch {
+        return ''
+    }
+}
+
+function Get-PackageVersionDirs {
+    param([string]$PackagePath)
+    $manifests = Join-Path $PackagePath 'manifests'
+    if (-not (Test-Path -LiteralPath $manifests -PathType Container)) {
+        return @()
+    }
+    return @(
+        Get-ChildItem -Path $manifests -Recurse -Directory |
+            Where-Object {
+                $relative = $_.FullName.Substring($manifests.Length).TrimStart('\', '/')
+                $parts = @($relative -split '[\\/]' | Where-Object { $_ })
+                $parts.Count -eq 4
+            }
+    )
+}
+
 function Get-LatestRelease {
     param(
         [string]$Repo,
@@ -337,15 +366,15 @@ function Get-LatestRelease {
     $assets = @{}
     foreach ($asset in @($data.assets)) {
         if ($asset.name -and $asset.browser_download_url) {
-            $assets[$asset.name] = $asset.browser_download_url
+            $assets[$asset.name] = [string]$asset.browser_download_url
         }
     }
-    $published = [string]$data.published_at
+    $tag = [string]$data.tag_name
     return [pscustomobject]@{
-        Tag           = [string]$data.tag_name
-        Version       = ConvertFrom-ReleaseTag -Tag ([string]$data.tag_name)
-        PublishedDate = if ($published.Length -ge 10) { $published.Substring(0, 10) } else { '' }
-        HtmlUrl       = if ($data.html_url) { [string]$data.html_url } else { "https://github.com/$Repo/releases/tag/$($data.tag_name)" }
+        Tag           = $tag
+        Version       = ConvertFrom-ReleaseTag -Tag $tag
+        PublishedDate = ConvertTo-IsoDate -Value $data.published_at
+        HtmlUrl       = if ($data.html_url) { [string]$data.html_url } else { "https://github.com/$Repo/releases/tag/$tag" }
         Assets        = $assets
     }
 }
@@ -402,7 +431,7 @@ function Update-InstallerYaml {
         [string]$Text,
         [string]$Version,
         [string]$ReleaseDate,
-        [hashtable]$Replacements
+        [object[]]$Replacements
     )
     $text = Set-YamlField -Text $Text -Key 'PackageVersion' -Value $Version
     if ($ReleaseDate) {
@@ -423,19 +452,18 @@ function Update-InstallerYaml {
     $pendingSha = $null
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in $lines) {
-        if ($line -match '\bInstallerUrl:') {
-            $oldUrl = ($line.Split('InstallerUrl:', 2)[1]).Trim()
-            if ($Replacements.ContainsKey($oldUrl)) {
-                $replacement = $Replacements[$oldUrl]
-                $line = $line.Replace($oldUrl, $replacement.Url)
-                $pendingSha = $replacement.Sha
+        if ($line -match '^(?<prefix>\s*InstallerUrl:\s*)(?<url>\S+)') {
+            $oldUrl = $Matches['url']
+            $entry = @($Replacements | Where-Object { $_.OldUrl -eq $oldUrl }) | Select-Object -First 1
+            if ($entry) {
+                $line = $Matches['prefix'] + $entry.NewUrl
+                $pendingSha = [string]$entry.Sha
             }
         }
-        elseif ($null -ne $pendingSha -and $line -match '\bInstallerSha256:') {
-            $parts = $line.Split('InstallerSha256:', 2)
-            $oldSha = $parts[1].Trim()
+        elseif ($null -ne $pendingSha -and $line -match '^(?<prefix>\s*InstallerSha256:\s*)(?<sha>\S+)') {
+            $oldSha = $Matches['sha']
             $sha = if ($oldSha -cmatch '^[0-9A-F]+$') { $pendingSha.ToUpperInvariant() } else { $pendingSha.ToLowerInvariant() }
-            $line = '{0}InstallerSha256: {1}' -f $parts[0], $sha
+            $line = $Matches['prefix'] + $sha
             $pendingSha = $null
         }
         $out.Add($line)
@@ -451,7 +479,7 @@ function New-ManifestVersion {
     param(
         [object]$Package,
         [object]$Release,
-        [hashtable]$Replacements,
+        [object[]]$Replacements,
         [switch]$WhatIf
     )
     $dest = Join-Path (Split-Path -Parent $Package.LocalDir) $Release.Version
@@ -577,9 +605,13 @@ function Submit-Manifest {
     $previous = $env:WINGET_CREATE_GITHUB_TOKEN
     $env:WINGET_CREATE_GITHUB_TOKEN = $Token
     try {
-        & $wingetcreate submit --prtitle $title --no-open $ManifestDir
-        if ($LASTEXITCODE -ne 0) {
-            throw "wingetcreate submit failed with exit code $LASTEXITCODE"
+        $wcOut = & $wingetcreate submit --prtitle $title --no-open $ManifestDir 2>&1
+        $wcCode = $LASTEXITCODE
+        foreach ($line in @($wcOut)) {
+            Write-Log "    $line"
+        }
+        if ($wcCode -ne 0) {
+            throw "wingetcreate submit failed with exit code $wcCode"
         }
     }
     finally {
@@ -670,24 +702,44 @@ function Update-Package {
     Write-Log "    local:       $($Package.LocalVersion)"
     Write-Log "    winget-pkgs: $publishedText"
 
-    if ((ConvertTo-VersionSortKey $release.Version) -lt (ConvertTo-VersionSortKey $Package.LocalVersion)) {
+    $versionDirs = @(Get-PackageVersionDirs -PackagePath $Package.Path)
+    $templateDir = $versionDirs |
+        Where-Object { (ConvertTo-VersionSortKey $_.Name) -lt (ConvertTo-VersionSortKey $release.Version) } |
+        Sort-Object { ConvertTo-VersionSortKey $_.Name } |
+        Select-Object -Last 1
+    $dest = Join-Path (Split-Path -Parent $Package.LocalDir) $release.Version
+    $needSubmit = $published -notcontains $release.Version
+    $needWrite = $needSubmit -or -not (Test-Path -LiteralPath $dest -PathType Container)
+
+    if ((ConvertTo-VersionSortKey $release.Version) -lt (ConvertTo-VersionSortKey $Package.LocalVersion) -and -not $needSubmit) {
         Write-Log '    skip: local version is newer than GitHub latest'
         return 'skipped'
     }
 
-    $dest = Join-Path (Split-Path -Parent $Package.LocalDir) $release.Version
-    $needWrite = -not (Test-Path -LiteralPath $dest -PathType Container)
-    $needSubmit = $published -notcontains $release.Version
-
     if ($needWrite) {
-        $replacements = @{}
-        foreach ($oldUrl in $Package.InstallerUrls) {
-            $asset = Resolve-InstallerAsset -OldUrl $oldUrl -OldVersion $Package.LocalVersion -NewVersion $release.Version -Assets $release.Assets
+        if (-not $templateDir) {
+            throw "No previous manifest version to copy for $($Package.Identifier) $($release.Version)"
+        }
+        $templatePackage = $Package.PSObject.Copy()
+        $templatePackage.LocalDir = $templateDir.FullName
+        $templatePackage.LocalVersion = $templateDir.Name
+        $installerText = [System.IO.File]::ReadAllText((Get-ManifestFile -VersionDir $templateDir.FullName -Kind installer).FullName)
+        $templatePackage.InstallerUrls = @(Get-YamlFields -Text $installerText -Key 'InstallerUrl')
+        Write-Log "    template:    $($templateDir.Name)"
+
+        $replacements = @()
+        foreach ($oldUrl in $templatePackage.InstallerUrls) {
+            $asset = Resolve-InstallerAsset -OldUrl $oldUrl -OldVersion $templatePackage.LocalVersion -NewVersion $release.Version -Assets $release.Assets
+            $newUrl = $oldUrl.Replace($templatePackage.LocalVersion, $release.Version)
             Write-Log "    installer:   $($asset.Name)"
-            $replacements[$oldUrl] = @{ Url = $asset.Url; Sha = '' }
+            $replacements += [pscustomobject]@{
+                OldUrl = $oldUrl
+                NewUrl = $newUrl
+                Sha    = ''
+            }
         }
         if ($WhatIf) {
-            $null = New-ManifestVersion -Package $Package -Release $release -Replacements $replacements -WhatIf
+            $null = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $replacements -WhatIf
             Update-PackageJustfile -Package $Package -NewVersion $release.Version -WhatIf
         }
         else {
@@ -695,16 +747,19 @@ function Update-Package {
             Remove-Item -LiteralPath $temp
             $tempDir = New-Item -ItemType Directory -Path "$temp.d"
             try {
-                $hashed = @{}
-                foreach ($oldUrl in $replacements.Keys) {
-                    $url = $replacements[$oldUrl].Url
-                    $filename = ($url.TrimEnd('/') -split '/')[-1]
+                $hashed = @()
+                foreach ($entry in $replacements) {
+                    $filename = ($entry.NewUrl.TrimEnd('/') -split '/')[-1]
                     $destFile = Join-Path $tempDir.FullName $filename
                     Write-Log "    downloading  $filename"
-                    Invoke-WebRequest -Uri $url -OutFile $destFile -UseBasicParsing
-                    $hashed[$oldUrl] = @{ Url = $url; Sha = Get-FileSha256 -Path $destFile }
+                    Invoke-WebRequest -Uri $entry.NewUrl -OutFile $destFile -UseBasicParsing
+                    $hashed += [pscustomobject]@{
+                        OldUrl = $entry.OldUrl
+                        NewUrl = $entry.NewUrl
+                        Sha    = Get-FileSha256 -Path $destFile
+                    }
                 }
-                $dest = New-ManifestVersion -Package $Package -Release $release -Replacements $hashed
+                $dest = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $hashed
             }
             finally {
                 Remove-Item -LiteralPath $tempDir.FullName -Recurse -Force -ErrorAction SilentlyContinue
