@@ -1,7 +1,7 @@
 Author := "SiakHooi"
 PackageName := "Picsum"
 
-packageVersion := "1.2.3"
+packageVersion := "1.2.2"
 packageUrl := "https://github.com/" + Author + "/" + PackageName + "/releases/download/v" + packageVersion + "/" + PackageName + "_" + packageVersion + "_Windows_x86_64.zip"
 
 manifestsPath := "manifests/s/" + Author + "/" + PackageName + "/" + packageVersion
