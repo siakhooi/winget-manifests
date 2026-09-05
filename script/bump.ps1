@@ -198,6 +198,14 @@ function Get-Newline {
     return "`n"
 }
 
+function Split-YamlLines {
+    param([string]$Text)
+    # Do not use `$text -split pattern, -1`. PowerShell treats a negative count as
+    # RegexOptions (IgnorePatternWhitespace and others), so the document is never
+    # split and InstallerUrl / InstallerSha256 line rewrites never match.
+    return [regex]::Split($Text, '\r\n|\n|\r')
+}
+
 function Write-Utf8NoBom {
     param(
         [string]$Path,
@@ -448,22 +456,24 @@ function Update-InstallerYaml {
         }
     }
     $nl = Get-Newline $text
-    $lines = $text -split "`r?`n", -1
+    $lines = Split-YamlLines -Text $text
     $pendingSha = $null
     $out = New-Object System.Collections.Generic.List[string]
     foreach ($line in $lines) {
         if ($line -match '^(?<prefix>\s*InstallerUrl:\s*)(?<url>\S+)') {
+            $prefix = $Matches['prefix']
             $oldUrl = $Matches['url']
             $entry = @($Replacements | Where-Object { $_.OldUrl -eq $oldUrl }) | Select-Object -First 1
             if ($entry) {
-                $line = $Matches['prefix'] + $entry.NewUrl
+                $line = $prefix + $entry.NewUrl
                 $pendingSha = [string]$entry.Sha
             }
         }
         elseif ($null -ne $pendingSha -and $line -match '^(?<prefix>\s*InstallerSha256:\s*)(?<sha>\S+)') {
+            $prefix = $Matches['prefix']
             $oldSha = $Matches['sha']
             $sha = if ($oldSha -cmatch '^[0-9A-F]+$') { $pendingSha.ToUpperInvariant() } else { $pendingSha.ToLowerInvariant() }
-            $line = $Matches['prefix'] + $sha
+            $line = $prefix + $sha
             $pendingSha = $null
         }
         $out.Add($line)
@@ -727,19 +737,19 @@ function Update-Package {
         $templatePackage.InstallerUrls = @(Get-YamlFields -Text $installerText -Key 'InstallerUrl')
         Write-Log "    template:    $($templateDir.Name)"
 
-        $replacements = @()
+        $replacements = New-Object System.Collections.Generic.List[object]
         foreach ($oldUrl in $templatePackage.InstallerUrls) {
             $asset = Resolve-InstallerAsset -OldUrl $oldUrl -OldVersion $templatePackage.LocalVersion -NewVersion $release.Version -Assets $release.Assets
             $newUrl = $oldUrl.Replace($templatePackage.LocalVersion, $release.Version)
             Write-Log "    installer:   $($asset.Name)"
-            $replacements += [pscustomobject]@{
+            $replacements.Add([pscustomobject]@{
                 OldUrl = $oldUrl
                 NewUrl = $newUrl
                 Sha    = ''
-            }
+            })
         }
         if ($WhatIf) {
-            $null = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $replacements -WhatIf
+            $null = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $replacements.ToArray() -WhatIf
             Update-PackageJustfile -Package $Package -NewVersion $release.Version -WhatIf
         }
         else {
@@ -747,19 +757,19 @@ function Update-Package {
             Remove-Item -LiteralPath $temp
             $tempDir = New-Item -ItemType Directory -Path "$temp.d"
             try {
-                $hashed = @()
+                $hashed = New-Object System.Collections.Generic.List[object]
                 foreach ($entry in $replacements) {
                     $filename = ($entry.NewUrl.TrimEnd('/') -split '/')[-1]
                     $destFile = Join-Path $tempDir.FullName $filename
                     Write-Log "    downloading  $filename"
                     Invoke-WebRequest -Uri $entry.NewUrl -OutFile $destFile -UseBasicParsing
-                    $hashed += [pscustomobject]@{
+                    $hashed.Add([pscustomobject]@{
                         OldUrl = $entry.OldUrl
                         NewUrl = $entry.NewUrl
                         Sha    = Get-FileSha256 -Path $destFile
-                    }
+                    })
                 }
-                $dest = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $hashed
+                $dest = New-ManifestVersion -Package $templatePackage -Release $release -Replacements $hashed.ToArray()
             }
             finally {
                 Remove-Item -LiteralPath $tempDir.FullName -Recurse -Force -ErrorAction SilentlyContinue
@@ -822,6 +832,9 @@ try {
         }
         catch {
             Write-Err "error: $($package.DirName): $_"
+            if ($_.ScriptStackTrace) {
+                Write-Err $_.ScriptStackTrace
+            }
             $failures += $package.DirName
             $results += "| $($package.DirName) | failed |"
         }
