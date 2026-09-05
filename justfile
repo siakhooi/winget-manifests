@@ -17,8 +17,8 @@ new:
 update:
     wingetcreate.exe update --urls "{{ packageUrl }}|x64" --version "{{ packageVersion }}"   {{ Author }}.{{ PackageName }}
 
-# Linux / GitHub Actions: check GitHub latest, write manifests, submit to winget-pkgs
+# Windows / GitHub Actions: sync fork, bump manifests, wingetcreate submit
 #   just bump
 #   just bump jexl-executor picsum
 bump *packages:
-    python3 script/bump.py {{ packages }}
+    powershell.exe -NoProfile -File script/bump.ps1 {{ packages }}
