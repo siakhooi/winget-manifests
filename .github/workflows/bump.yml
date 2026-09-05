@@ -1,0 +1,42 @@
+name: Bump winget manifests
+
+on:
+  schedule:
+    # 04:00 Malaysia time (Asia/Kuala_Lumpur)
+    - cron: "0 4 * * *"
+      timezone: "Asia/Kuala_Lumpur"
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "Package names (space-separated). Empty = all."
+        required: false
+        type: string
+
+concurrency:
+  group: bump-winget-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump manifests
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bump manifests and submit to winget-pkgs
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          BUMP_PACKAGES: ${{ github.event.inputs.packages }}
+        run: |
+          $pkgs = @()
+          if ($env:BUMP_PACKAGES) {
+            $pkgs = $env:BUMP_PACKAGES -split '[,\s]+' | Where-Object { $_ }
+          }
+          & ./script/bump.ps1 @pkgs
