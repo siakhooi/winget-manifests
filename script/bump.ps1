@@ -8,6 +8,11 @@
     installer URLs / SHA-256 / dates, submits a PR with wingetcreate.exe, and commits
     the new files in this repo.
 
+    Submit runs only when this run creates the version folder. If that folder already
+    exists, the version is not rewritten or resubmitted, even if it is still missing
+    from microsoft/winget-pkgs (leave a failed version in place to skip it; delete
+    the folder to retry).
+
     With no package arguments, every package is processed. Otherwise only the named
     packages are processed (directory name, PackageName, or PackageIdentifier).
 
@@ -718,8 +723,9 @@ function Update-Package {
         Sort-Object { ConvertTo-VersionSortKey $_.Name } |
         Select-Object -Last 1
     $dest = Join-Path (Split-Path -Parent $Package.LocalDir) $release.Version
-    $needSubmit = $published -notcontains $release.Version
-    $needWrite = $needSubmit -or -not (Test-Path -LiteralPath $dest -PathType Container)
+    $alreadyPublished = $published -contains $release.Version
+    $needWrite = -not (Test-Path -LiteralPath $dest -PathType Container)
+    $needSubmit = $needWrite -and -not $alreadyPublished
 
     if ((ConvertTo-VersionSortKey $release.Version) -lt (ConvertTo-VersionSortKey $Package.LocalVersion) -and -not $needSubmit) {
         Write-Log '    skip: local version is newer than GitHub latest'
@@ -785,9 +791,13 @@ function Update-Package {
         Write-Log '    skip submit (-SkipSubmit)'
         if ($needWrite) { return 'updated' } else { return 'current' }
     }
-    if (-not $needSubmit) {
+    if ($alreadyPublished) {
         Write-Log '    skip submit: already in microsoft/winget-pkgs'
         return 'current'
+    }
+    if (-not $needSubmit) {
+        Write-Log '    skip submit: version folder already exists (delete it to resubmit)'
+        return 'skipped'
     }
 
     Submit-Manifest -ManifestDir $dest -Identifier $Package.Identifier -Version $release.Version -Token $SubmitToken -WhatIf:$WhatIf
