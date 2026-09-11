@@ -2,7 +2,6 @@ name: Bump winget manifests
 
 on:
   schedule:
-    # 04:00 Malaysia time (Asia/Kuala_Lumpur)
     - cron: "0 4 * * *"
       timezone: "Asia/Kuala_Lumpur"
   workflow_dispatch:
@@ -15,9 +14,6 @@ on:
 concurrency:
   group: bump-winget-${{ github.ref }}
   cancel-in-progress: false
-
-permissions:
-  contents: write
 
 jobs:
   bump:
@@ -32,7 +28,7 @@ jobs:
         shell: pwsh
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
           BUMP_PACKAGES: ${{ github.event.inputs.packages }}
         run: |
           $pkgs = @()
