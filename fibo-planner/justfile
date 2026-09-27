@@ -1,0 +1,18 @@
+set shell := ["powershell.exe", "-c"]
+
+Author := "SiakHooi"
+packageVersion := "0.7.0"
+PackageName := "FiboPlanner"
+packageUrl := "https://github.com/" + Author + "/" + PackageName + "/releases/download/v" + packageVersion + "/" + PackageName + "_" + packageVersion + "_Windows_x86_64.zip"
+manifestsPath := "manifests/s/" + Author + "/" + PackageName + "/" + packageVersion
+pr_title := Author + "." + PackageName + " " + packageVersion
+gh_token := ""
+
+default:
+    @just --list
+validate:
+    winget.exe validate --manifest "{{ manifestsPath }}"
+test:
+    winget.exe install --verbose --log test.log --manifest "{{ manifestsPath }}"
+submit:
+    wingetcreate.exe submit --prtitle "{{ pr_title }}" --token "{{ gh_token }}" "{{ manifestsPath }}"
