@@ -1,7 +1,7 @@
 set shell := ["powershell.exe", "-c"]
 
 Author := "SiakHooi"
-packageVersion := "0.7.0"
+packageVersion := "0.7.1"
 PackageName := "FiboPlanner"
 packageUrl := "https://github.com/" + Author + "/" + PackageName + "/releases/download/v" + packageVersion + "/" + PackageName + "_" + packageVersion + "_Windows_x86_64.zip"
 manifestsPath := "manifests/s/" + Author + "/" + PackageName + "/" + packageVersion
