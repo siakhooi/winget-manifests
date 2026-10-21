@@ -5,6 +5,7 @@ manifests for winget
 - https://github.com/siakhooi/jexl-executor
 - https://github.com/siakhooi/semvery
 - https://github.com/siakhooi/picsum
+- https://github.com/siakhooi/fibo-planner
 
 ## Bump latest releases
 
