@@ -1,3 +1,4 @@
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 Author := "SiakHooi"
 packageVersion := "0.2.0"
 PackageName := "Cooonfig"
@@ -9,6 +10,8 @@ validate:
 
 test:
     winget.exe install --verbose --log test.log --manifest "{{ manifestsPath }}"
+remove:
+    winget.exe uninstall --verbose --log test.log --manifest "{{ manifestsPath }}"
 
 pr_title := Author + "." + PackageName + " " + packageVersion
 gh_token := ""
