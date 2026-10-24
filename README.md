@@ -6,6 +6,7 @@ manifests for winget
 - https://github.com/siakhooi/semvery
 - https://github.com/siakhooi/picsum
 - https://github.com/siakhooi/fibo-planner
+- https://github.com/siakhooi/cooonfig
 
 ## Bump latest releases
 
